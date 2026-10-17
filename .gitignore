@@ -1,0 +1,18 @@
+# Secrets: kabhi commit nahi
+.env
+
+# Competition data aur generated output (data dobara share nahi karna)
+data/*
+!data/.gitkeep
+out/*
+!out/.gitkeep
+
+# Airflow / Python / editor
+logs/
+__pycache__/
+*.pyc
+.venv/
+.vscode/
+.idea/
+.DS_Store
+*.log
