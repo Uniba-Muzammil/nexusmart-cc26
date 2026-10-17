@@ -39,16 +39,14 @@ repo/
   CHANGES.md
   .gitignore
 ```
-Agar A ne pehle se `sql/` ya `docs/` bana rakha hai to unhi mein rakhein, folder naam badalne ki zaroorat nahi.
+Agar A ne pehle se `sql/` ya `docs/` bana rakha hai to unhi mein rakhein, folder naam badalne ki zaroorat nahi. agar a ney nhi banaya hai tou older folder bana hua hai yahi use kareinn
 
 ### 2.2 Commands
 ```bash
 git checkout main && git pull
-git checkout -b feature/cleaning-b
+git checkout -b to your relevant branch eg pipeline/cleaning-b
 
-# zip kholein aur repo mein copy karein
-unzip memberB_cleaning_v3.zip -d /tmp/b
-cp -r /tmp/b/* .
+
 
 # purani config.py ab nahi chahiye (naam badal kar nx_config.py ho gayi)
 git rm -f src/clean/config.py 2>/dev/null || true
