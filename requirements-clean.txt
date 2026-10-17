@@ -1,0 +1,4 @@
+pandas>=2.2
+numpy
+reportlab          # PDF report only
+psycopg2-binary    # Postgres load only

@@ -1,0 +1,64 @@
+step,table,issue,column,before_count,after_count,action,assumption
+1,locations,INCONSISTENT LABELS,province,20,8,mapped to canonical set via nx_config.LABELS['province'],0 rows matched fuzzily; 0 unmatched -> 'Unknown'; 25 blank -> 'Unknown'
+2,locations,INCONSISTENT LABELS,population_tier,3,3,mapped to canonical set via nx_config.LABELS['population_tier'],0 rows matched fuzzily; 0 unmatched -> 'Unknown'; 0 blank -> 'Unknown'
+3,locations,BAD COORDINATES,latitude/longitude,68,62,6 swapped lat/lon fixed; 62 outside Pakistan set to NULL,"Pakistan bbox lat 23-38, lon 60-78"
+4,locations,MISSING PROVINCE,province,25,0,filled from 5 nearest cities by coordinates,leave-one-out accuracy 87.0%; applied only if >= 85%
+5,sellers,INCONSISTENT LABELS,seller_tier,8,4,mapped to canonical set via nx_config.LABELS['seller_tier'],0 rows matched fuzzily; 0 unmatched -> 'Unknown'; 22 blank -> 'Unknown'
+6,sellers,RATING OUT OF RANGE,rating,22,0,set to NULL,valid rating 1.0-5.0; 33 already missing stay NULL (not imputed: ratings are a quality signal)
+7,products,INCONSISTENT LABELS,category,62,12,mapped to canonical set via nx_config.LABELS['category'],0 rows matched fuzzily; 0 unmatched -> 'Unknown'; 0 blank -> 'Unknown'
+8,products,MISSING BRAND,brand,392,10,filled from first word of product_name when it is a known brand; else 'Unknown',product names start with the brand in this catalogue
+9,products,MISSING SUB_CATEGORY,sub_category,485,10,"inferred from (category, product type); remainder 'Unknown'",475 inferred where the type->sub_category mapping is >=90% consistent
+10,products,BAD WEIGHT,weight_kg,17,0,set to NULL,valid 0<w<=100; 296 originally missing stay NULL
+11,products,BAD LIST PRICE,list_price,13,0,replaced with median unit_price actually charged on that product's lines,"invalid = <=0, sentinel, or >25% away from median charged price (needs >=3 lines)"
+12,products,MISSING/BAD COST PRICE,cost_price,237,0,imputed list_price x median(cost/list) of the category; flagged cost_imputed=1,"missing 170, cost>list 67; median ratio 0.61"
+13,products,DUPLICATE PRODUCTS,product_id,3200,3174,merged to lowest product_id; dup->master kept in product_map,match = normalised name + brand + category; sellers/price may differ between listings (order lines keep their own seller_id)
+14,customers,PHONE NORMALISATION,phone,41401,41401,"digits only, 03XXXXXXXXX format; unparseable -> NULL",3599 originally missing
+15,customers,INCONSISTENT LABELS,gender,8,3,mapped to canonical set via nx_config.LABELS['gender'],0 rows matched fuzzily; 0 unmatched -> 'Unknown'; 2199 blank -> 'Unknown'
+16,customers,MISSING / IMPOSSIBLE REGISTRATION DATE,registration_date,319,319,kept as NULL (not repairable from other data),registration dates legitimately precede the 2024-25 order window
+17,customers,BIRTH YEAR OUT OF RANGE,birth_year,142,0,set to NULL,valid 1940-2010; 4600 originally missing stay NULL
+18,customers,DUPLICATE CUSTOMERS,customer_id,45000,42444,merged to lowest customer_id; every dup->master pair kept in customer_map,link = same normalised email OR same phone (phone links also need name similarity >= 0.7); 1 phone links skipped; never name alone
+19,orders,EXACT DUPLICATE ROWS,(all columns),163200,160000,"drop_duplicates, count logged",rows identical in every column are the same record exported twice
+20,orders,IMPOSSIBLE / UNPARSEABLE DATE,order_date,1124,0,see repair below,"30 Feb, 31 Apr, month 13, 00/00/yyyy cannot be parsed"
+21,orders,DATE OUT OF RANGE,order_date,481,0,see repair below,valid window 2024-01-01..2025-06-30
+22,orders,ORDER DATE REPAIR,order_date,1605,13,"1455 repaired as shipped_date - 1d, 137 as payment_date - 1d, 13 rejected (BAD_DATE / DATE_OUT_OF_RANGE)",shipped_date - order_date is 1 day (0-2 on 100% of valid rows) so it is the most accurate anchor; payment lag is spread over 0-11+ days so it is the fallback
+23,orders,INCONSISTENT LABELS,order_status,19,4,mapped to canonical set via nx_config.LABELS['order_status'],0 rows matched fuzzily; 0 unmatched -> 'Unknown'; 0 blank -> 'Unknown'
+24,orders,INCONSISTENT LABELS,channel,12,3,mapped to canonical set via nx_config.LABELS['channel'],0 rows matched fuzzily; 0 unmatched -> 'Unknown'; 0 blank -> 'Unknown'
+25,orders,BAD ORDER TOTAL,order_total,488,0,"set NULL then recomputed from clean order lines (sentinel 9999999, <=0, 'Rs. 1,234' text parsed)",
+26,orders,BROKEN REFERENCE,customer_id,321,321,kept; flagged orphan_customer=1 -> mapped to Unknown (-1) in DimCustomer,line is never deleted
+27,orders,MISSING / BAD SHIP CITY,ship_city_id,6388,6388,left NULL -> Unknown (-1) in DimLocation,NOT filled from the customer's city: ship city differs from customer city on ~11% of orders
+28,order_items,EXACT DUPLICATE ROWS,(all columns),315143,315143,drop_duplicates,
+29,order_items,BROKEN REFERENCE,product_id,932,932,kept; flagged orphan_product=1 -> Unknown (-1) in DimProduct (COGS unknown for these lines),
+30,order_items,BROKEN REFERENCE,seller_id,0,0,kept; flagged orphan_seller=1 -> Unknown (-1) in DimSeller,
+31,order_items,QUANTITY OUTLIER / INVALID,quantity,948,9,negative -> abs (307); words/'2.0' -> number; 500 / >10 recovered from order_total (632); unrecoverable -> reject BAD_QTY (9),abs() of negatives matches order_total on ~99.7% of lines; qty 500 is an injected outlier (legit max is 6)
+32,order_items,BAD UNIT PRICE,unit_price,1557,0,"1528 solved from order_total, 29 set to list_price x 1.0259, 0 rejected BAD_PRICE","invalid = <=0, sentinel 9999999, or unit/list ratio outside 0.5-2.0 (valid data sits in 0.99-1.10)"
+33,order_items,MISSING / WRONG DISCOUNT,discount_amount,32446,0,recomputed = round(quantity x unit_price x discount_code%),"31563 blank; 883 disagreed with the code (inflated, > gross); order-level code applies to every line (spec)"
+34,orders,ORDER TOTAL vs LINES,order_total,159499,159457,order_total filled from sum(line net) where invalid; match rate after repair shown in after_count,"before = orders with a valid raw total, after = those whose total equals sum(qty x price - discount) +-2"
+35,order_items,NO PRODUCT COST FOR LINE,unit_cost,932,0,unit_cost = unit_price x 0.5719 (median cost/unit_price of lines with a genuine product cost); flagged cost_source=NO_PRODUCT_COST_ESTIMATE,orphan-product lines have no product record; COGS 0 would overstate margin. CostAmount in FactSales = unit_cost x quantity
+36,payments,EXACT DUPLICATE ROWS,(all columns),168111,164815,drop_duplicates,
+37,payments,INCONSISTENT LABELS,payment_method,21,5,mapped to canonical set via nx_config.LABELS['payment_method'],0 rows matched fuzzily; 0 unmatched -> 'Unknown'; 0 blank -> 'Unknown'
+38,payments,INCONSISTENT LABELS,payment_status,16,4,mapped to canonical set via nx_config.LABELS['payment_status'],0 rows matched fuzzily; 0 unmatched -> 'Unknown'; 0 blank -> 'Unknown'
+39,payments,BAD PAYMENT AMOUNT,amount,985,0,replaced with the order's total (payment amount equals order_total in normal rows),left NULL where the order total itself is unknown
+40,payments,SPLIT PAYMENTS,order_id,9630,159987,orders with 2 payment rows are split payments (parts sum to order_total); is_primary=1 marks one row per order for FactSales,"primary = Paid/Refunded first, then larger part, then later payment_date; 55 bad part amounts rebuilt as order_total - other part"
+41,payments,MISSING / IMPOSSIBLE DATE,payment_date,5984,5984,kept NULL,payment_date is not used for revenue; used only to pick between 2 payment rows
+42,shipping,EXACT DUPLICATE ROWS,(all columns),151228,151228,drop_duplicates,
+43,shipping,INCONSISTENT LABELS,courier,22,6,mapped to canonical set via nx_config.LABELS['courier'],0 rows matched fuzzily; 0 unmatched -> 'Unknown'; 0 blank -> 'Unknown'
+44,shipping,INCONSISTENT LABELS,delivery_status,15,3,mapped to canonical set via nx_config.LABELS['delivery_status'],0 rows matched fuzzily; 0 unmatched -> 'Unknown'; 0 blank -> 'Unknown'
+45,shipping,MISSING DATE,shipped_date,6961,6961,kept NULL,ShippingDays then unknown for that order
+46,shipping,DELIVERED BEFORE SHIPPED,delivered_date,1269,0,delivered_date set to NULL (flag date_fix),"all such rows are exactly shipped-2 days: a systematic export fault, true date unknown"
+47,shipping,DELIVERY > 60 DAYS,delivered_date,266,0,delivered_date set to NULL (flag date_fix),legit tail ends ~30 days; the 88-102 day cluster is corrupt
+48,shipping,MISSING / BAD SHIPPING FEE,shipping_fee,9598,0,imputed with the mean valid fee (545); flagged fee_imputed=1,454 sentinel/negative values + 9144 blanks; mean (not median) so total shipping cost is preserved; fee does not depend on courier
+49,returns,EXACT DUPLICATE ROWS,(all columns),16048,16048,drop_duplicates,
+50,returns,BROKEN REFERENCE,order_item_id,139,0,rejected ORPHAN_RETURN,
+51,returns,INCONSISTENT LABELS,return_status,10,3,mapped to canonical set via nx_config.LABELS['return_status'],0 rows matched fuzzily; 0 unmatched -> 'Unknown'; 0 blank -> 'Unknown'
+52,returns,INCONSISTENT LABELS,return_reason,37,10,mapped to canonical set via nx_config.LABELS['return_reason'],0 rows matched fuzzily; 0 unmatched -> 'Unknown'; 2367 blank -> 'Unknown'
+53,returns,BAD REFUND AMOUNT,refund_amount,203,0,valid returns with refund <=0 or > line gross set to the line's gross amount (full refund),"refund == line gross in the modal case (7.6k rows); partial refunds (25-99%) are real and untouched. Rejected returns are not valid, amount kept as is"
+54,returns,BAD RETURN DATE,return_date,256,0,set to order_date + 10 days (median observed lag); flagged date_fixed=1,"invalid = unparseable, before the order date, or >90 days after it"
+55,customers,TABLE SUMMARY,,45000,42444,"read 45000, rejected 0, loaded 42444",difference = exact duplicates removed + merged duplicates + rejected
+56,products,TABLE SUMMARY,,3200,3174,"read 3200, rejected 0, loaded 3174",difference = exact duplicates removed + merged duplicates + rejected
+57,sellers,TABLE SUMMARY,,420,420,"read 420, rejected 0, loaded 420",difference = exact duplicates removed + merged duplicates + rejected
+58,locations,TABLE SUMMARY,,650,650,"read 650, rejected 0, loaded 650",difference = exact duplicates removed + merged duplicates + rejected
+59,orders,TABLE SUMMARY,,163200,159987,"read 163200, rejected 13, loaded 159987",difference = exact duplicates removed + merged duplicates + rejected
+60,order_items,TABLE SUMMARY,,315143,315103,"read 315143, rejected 40, loaded 315103",difference = exact duplicates removed + merged duplicates + rejected
+61,payments,TABLE SUMMARY,,168111,164802,"read 168111, rejected 13, loaded 164802",difference = exact duplicates removed + merged duplicates + rejected
+62,shipping,TABLE SUMMARY,,151228,151222,"read 151228, rejected 6, loaded 151222",difference = exact duplicates removed + merged duplicates + rejected
+63,returns,TABLE SUMMARY,,16048,15908,"read 16048, rejected 140, loaded 15908",difference = exact duplicates removed + merged duplicates + rejected

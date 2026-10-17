@@ -1,0 +1,22 @@
+decision,rows_affected,metric,baseline,alternative,delta,delta_pct_or_pts,unit,exceeds_tolerance,note
+Price repair -> reject repaired lines instead,1557,NMV,1199960496.0,1194357564.0,-5602932.0,-0.4669,%,no,
+Price repair -> list price instead of order_total,1528,NMV,1199960496.0,1199738559.0,-221937.0,-0.0185,%,no,
+Qty outlier (500) -> reject instead of recover from order_total,632,NMV,1199960496.0,1197685082.0,-2275414.0,-0.1896,%,no,
+Negative qty -> drop lines instead of abs(),307,NMV,1199960496.0,1198713646.0,-1246850.0,-0.1039,%,no,
+Order date repair -> reject those orders instead,1592,NMV,1199960496.0,1187626162.0,-12334334.0,-1.0279,%,YES,
+Discount -> trust raw discount_amount (blank=0) instead of code%,31563,NMV,1199960496.0,1206131656.0,6171160.0,0.5143,%,no,
+Orphan-product lines -> drop instead of Unknown member,932,NMV,1199960496.0,1195663078.0,-4297418.0,-0.3581,%,no,
+In Transit excluded from NMV (spec says INCLUDE),2692,NMV,1199960496.0,1188945224.0,-11015272.0,-0.918,%,no,
+Refund repair -> leave raw refund (0 / > line gross),203,NetRevenue,1142292237.0,1141927397.0,-364840.0,-0.0319,%,no,
+Duplicate orders NOT removed (cancellation rate),3213,CancelRate,9.1601,9.174,0.0139,0.0139,pts,no,
+Rejected returns counted as valid (spec says NOT valid),1311,ReturnRate,5.1484,5.6108,0.4624,0.4624,pts,no,
+Order date repair by payment_date instead of shipped_date (monthly shift only; NMV total unchanged),122,NMV moved between months,,,,0.0689,% of NMV,no,
+Imputed cost -> exclude those products from margin instead,21625,MarginPct,26.6853,26.6978,0.0126,0.0126,pts,no,"Margin amount -7.13%. imputation error on products with a genuine cost: median 5.4%, p90 13.9%"
+Imputed cost biased by -5% (about the median imputation error),21625,MarginPct,26.6853,26.9488,0.2636,0.2636,pts,no,"Margin amount +0.99%. imputation error on products with a genuine cost: median 5.4%, p90 13.9%"
+Imputed cost biased by +5% (about the median imputation error),21625,MarginPct,26.6853,26.4217,-0.2636,-0.2636,pts,no,"Margin amount -0.99%. imputation error on products with a genuine cost: median 5.4%, p90 13.9%"
+Imputed cost biased by -20% (stress test),21625,MarginPct,26.6853,27.7396,1.0543,1.0543,pts,stress only,"Margin amount +3.95%. imputation error on products with a genuine cost: median 5.4%, p90 13.9%; errors are per-product and largely cancel (bias +0.7%), a systematic bias of ~10% would be needed to leave tolerance"
+Imputed cost biased by +20% (stress test),21625,MarginPct,26.6853,25.631,-1.0543,-1.0543,pts,stress only,"Margin amount -3.95%. imputation error on products with a genuine cost: median 5.4%, p90 13.9%; errors are per-product and largely cancel (bias +0.7%), a systematic bias of ~10% would be needed to leave tolerance"
+cost_price > list_price kept as valid instead of imputed,6772,MarginPct,26.6853,24.6853,-1.9999,-1.9999,pts,YES,"Margin amount -7.49%. all 65 such products (list price untouched) have cost = 1.50 x list_price, while normal products never exceed 0.97 -> systematic corruption"
+Orphan-product lines: COGS = 0 instead of estimated cost,932,MarginPct,26.6853,26.9055,0.2202,0.2202,pts,no,Margin amount +0.83%. estimate = unit_price x median(cost/unit_price)
+Orphan-product lines: excluded from margin instead,932,MarginPct,26.6853,26.6432,-0.042,-0.042,pts,no,Margin amount -0.51%. 
+Customer dedupe (active customers),2556,ActiveCustomers,32836,31779,-1057,-3.219,%,YES,"affects Active Customers, repeat rate, CLV, RFM - not NMV"
