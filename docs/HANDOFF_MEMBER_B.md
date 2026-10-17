@@ -19,7 +19,7 @@ Har cheez jo yahan "tested" likhi hai woh maine chala kar dekhi hai (details Sec
 | Docs | `README_CLEANING.md`, `CHANGES.md`, yeh guide | sab |
 | Sample outputs | `out_samples/` (dq_log, reject, sensitivity) | judge / reviewer |
 
-Clean output ka nateeja: **11 clean tables + dq_log + reject**, 9 raw CSV se. Naam aur columns playbook ke mutabiq hain.
+Clean output ka nateeja: **11 clean tables + dq_log + reject**, 9 raw CSV se. Naam aur columns playbook ke mutabiq hain
 
 **Naya in v3:** `nx_config.py` (pehle `config.py`, Airflow ke `config/` folder se takrata), `clean_schema.py`, `load_postgres.py`, `example_fact_sales.sql`.
 
