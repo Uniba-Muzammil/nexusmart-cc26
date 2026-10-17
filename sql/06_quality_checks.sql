@@ -12,9 +12,13 @@ WITH checks AS (
             WHERE order_id IN (SELECT order_id FROM staging.order_items GROUP BY order_id) AND order_id IN (SELECT order_id FROM staging.orders)),
          (SELECT ROUND(SUM(shipping_fee),0) FROM dw.fact_sales)
   UNION ALL SELECT 'returned lines = valid returns (matched lines)',
-         (SELECT COUNT(*) FROM (SELECT DISTINCT order_item_id FROM staging.returns WHERE is_valid_return='True') r
+         (SELECT COUNT(*) FROM (SELECT DISTINCT order_item_id FROM staging.returns WHERE lower(is_valid_return) IN ('true','1','t','yes')) r
             WHERE order_item_id IN (SELECT order_item_id FROM dw.fact_sales)),
          (SELECT COUNT(*) FROM dw.fact_sales WHERE is_returned)
+  UNION ALL SELECT 'valid returns mojood hain (0 nahi honi chahiye)', 1,
+         (SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM dw.fact_sales WHERE is_returned)
+  UNION ALL SELECT 'cost_amount NULL lines (0 honi chahiye)', 0,
+         (SELECT COUNT(*) FROM dw.fact_sales WHERE cost_amount IS NULL)
   UNION ALL SELECT 'Unknown member in 5 dims', 5,
          (SELECT (SELECT COUNT(*) FROM dw.dim_date WHERE date_key=-1)+(SELECT COUNT(*) FROM dw.dim_customer WHERE customer_key=-1)
                + (SELECT COUNT(*) FROM dw.dim_product WHERE product_key=-1)+(SELECT COUNT(*) FROM dw.dim_seller WHERE seller_key=-1)

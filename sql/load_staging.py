@@ -26,6 +26,8 @@ with conn, conn.cursor() as cur:
     cur.execute("CREATE SCHEMA IF NOT EXISTS staging")
     for t in TABLES:
         path = out / f"{t}.csv"
+        if not path.exists():
+            print(f"{t}.csv nahi mili, skip"); continue
         with open(path, newline="", encoding="utf-8") as f:
             cols = next(csv.reader(f))
         cur.execute(f"DROP TABLE IF EXISTS staging.{t}")

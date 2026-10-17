@@ -11,7 +11,7 @@ ret AS (
          (ARRAY_AGG(return_reason ORDER BY return_date DESC, return_id DESC))[1] AS return_reason,
          (ARRAY_AGG(return_status ORDER BY return_date DESC, return_id DESC))[1] AS return_status
   FROM staging.returns
-  WHERE is_valid_return = 'True'
+  WHERE lower(is_valid_return) IN ('true','1','t','yes')
   GROUP BY order_item_id
 ),
 -- payments: ek order ki ek row (Paid ko tarjeeh, phir latest)
@@ -30,15 +30,14 @@ ship AS (
 ),
 lines AS (
   SELECT oi.order_item_id, oi.order_id,
-         COALESCE(pm.master_id, oi.product_id) AS product_id,
+         oi.product_id,
          oi.seller_id,
          dw.safe_num(oi.quantity)::int          AS quantity,
          dw.safe_num(oi.unit_price)             AS unit_price,
          dw.safe_num(oi.quantity) * dw.safe_num(oi.unit_price) AS gross,
          COALESCE(dw.safe_num(oi.discount_amount),0) AS discount,
-         dw.safe_num(oi.cost_price) * dw.safe_num(oi.quantity) AS cost
+         dw.safe_num(oi.unit_cost) * dw.safe_num(oi.quantity) AS cost
   FROM staging.order_items oi
-  LEFT JOIN staging.product_map pm ON pm.dup_id = oi.product_id
 ),
 alloc AS (   -- order ki shipping fee lines mein gross ke hisaab se baantna (double count nahi)
   SELECT l.*,
@@ -68,8 +67,7 @@ SELECT
   o.order_status, pay.payment_method, o.channel
 FROM alloc a
 JOIN staging.orders o               ON o.order_id = a.order_id          -- rejected orders ki lines bahar
-LEFT JOIN staging.customer_map cm   ON cm.dup_id = o.customer_id
-LEFT JOIN dw.dim_customer dc        ON dc.customer_id = COALESCE(cm.master_id, o.customer_id)
+LEFT JOIN dw.dim_customer dc        ON dc.customer_id = o.customer_id
 LEFT JOIN dw.dim_product  dp        ON dp.product_id  = a.product_id
 LEFT JOIN dw.dim_seller   ds        ON ds.seller_id   = a.seller_id
 LEFT JOIN dw.dim_location dl        ON dl.city_id     = split_part(o.ship_city_id,'.',1)
