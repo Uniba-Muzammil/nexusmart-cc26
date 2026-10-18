@@ -1,10 +1,13 @@
 # NexusMart Data Analytics Pipeline (CODE//CONNECT'26) 
+# (USE VS CODE TERMINAL FOR BETTER EXPERIENCE)
+
 clone the repo https://github.com/Uniba-Muzammil/nexusmart-cc26.git
 git checkout main
 git pull origin main
 
 # PART A (DATA CLEANING)
-## Where to put the data (not pushed to repo because they are confidential)
+
+# Where to put the data (not pushed to repo because they are confidential)
 After cloning, you will see an empty `data/` folder (it contains only a `.gitkeep` placeholder so that Git keeps the folder). Download or copy the 9 raw CSV files and readme data file (basically the zip file provided by the module lead) into `data/`: customers, products, sellers, locations, orders, order_items, payments, shipping, returns
 # THEN 
 pip install -r requirements-clean.txt
@@ -19,76 +22,16 @@ python src/clean/sensitivity.py data out
 
 # Create .env
 Run this in terminal "copy .env.example .env " OR you can directly create a env file in the project root, than use the .env.example file to add data in env you can use the same example data will be helpful or you can have your username and password accept for the WH_PW that should be same.
-
 # Start Docker
 docker compose up airflow-init
 docker compose up -d
-
 # Run the pipeline
-Open http://localhost:8080 and log in with AIRFLOW_ADMIN_USER / AIRFLOW_ADMIN_PW from your .env. Find nexusmart_analytics_pipeline, press ▶ and choose Trigger DAG.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# NexusMart Data Analytics Pipeline (CODE//CONNECT'26)
-
-Raw CSVs → Python cleaning → PostgreSQL star schema → quality checks → KPI views → Power BI.
-Everything runs as one Airflow DAG inside Docker, so it behaves the same on any computer.
-
-## What you need
-
-- Docker Desktop (Windows: WSL2 enabled), running
-- Git
-- The 9 competition CSVs (they are not in this repo)
-
-## Run it (5 steps)
-
-**1. Get the code**
-```bash
-git clone https://github.com/Uniba-Muzammil/nexusmart-cc26.git
-cd nexusmart-cc26
-```
-
-**2. Put the raw data in `data/`**
-
-Create a folder `data` and copy the 9 CSVs into it:
-`customers.csv, products.csv, sellers.csv, locations.csv, orders.csv, order_items.csv, payments.csv, shipping.csv, returns.csv`
-
-**3. Create your `.env`** (passwords live here only, never in code)
-```bash
-cp .env.example .env          # Windows PowerShell: copy .env.example .env
-```
-Open `.env` and replace every `change_me...` value with your own.
-
-**4. Start Docker** (first time takes a few minutes to build the image)
-```bash
-docker compose up airflow-init
-docker compose up -d
-```
-
-**5. Run the pipeline**
-
-Open http://localhost:8080, log in with `AIRFLOW_ADMIN_USER` / `AIRFLOW_ADMIN_PW` from your `.env`,
-find `nexusmart_analytics_pipeline` and press ▶ (Trigger DAG). Or from the terminal:
-```bash
+Open http://localhost:8080 and log in with AIRFLOW_ADMIN_USER / AIRFLOW_ADMIN_PW from your .env. Find nexusmart_analytics_pipeline, press ▶ and choose Trigger DAG. (MAKE SURE PORT 8080 IS FREE)
+# Or from the terminal:
 docker compose exec airflow-scheduler airflow dags trigger nexusmart_analytics_pipeline
-```
-All 10 tasks turn green in a few minutes. Running it again is safe and gives the same result.
 
-Stop everything: `docker compose down` (add `-v` to also delete the database volumes).
 
 ## What the pipeline does
-
 ```
 extract → validate_raw → clean → check_contract → load_staging
         → build_dimensions → build_fact → quality_checks → publish_metrics → verify_cleaned_data_unchanged
@@ -108,6 +51,11 @@ extract → validate_raw → clean → check_contract → load_staging
 | `verify_cleaned_data_unchanged` | checks (sha256) that no cleaned file changed after the `clean` task | `dags/nexusmart_dag.py` |
 
 Each task logs records **read / rejected / loaded** (Airflow UI → task → Logs).
+
+
+
+
+
 
 ## Where the results are
 
