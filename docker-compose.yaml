@@ -68,7 +68,7 @@ services:
       POSTGRES_PASSWORD: ${WH_PW}
       POSTGRES_DB: wh
     ports:
-      - "5433:5432"
+      - "5440:5432"
     volumes:
       - wh-data:/var/lib/postgresql/data
     healthcheck:
