@@ -1,0 +1,10 @@
+# Only requirements-clean.txt is needed to build the image. Data, outputs and code are mounted at run time.
+.git
+.env
+data
+out
+out_samples
+logs
+bi
+docs
+**/__pycache__

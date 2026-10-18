@@ -1,0 +1,136 @@
+# NexusMart pipeline: Airflow 2.10.5 (LocalExecutor) + warehouse Postgres.
+# All secrets come from .env (copy .env.example to .env). Nothing secret is written here.
+#
+#   docker compose up airflow-init        # first time only
+#   docker compose up -d                  # Airflow UI on http://localhost:8080
+#
+# Warehouse from your own computer (Power BI, psql): host localhost, port 5433, db wh, user wh, password WH_PW.
+
+x-airflow-common: &airflow-common
+  build: .
+  image: nexusmart-airflow:2.10.5
+  user: "${AIRFLOW_UID:-50000}:0"
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PW}@airflow-db/airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
+    PYTHONDONTWRITEBYTECODE: "1"
+    # pipeline settings (read by dags/nexusmart_dag.py and src/clean/nx_config.py)
+    NX_REPO_ROOT: /opt/airflow
+    DATA_DIR: /opt/airflow/data
+    OUT_DIR: /opt/airflow/out
+    NX_CLEAN_MODE: ${NX_CLEAN_MODE:-auto}
+    NX_DATE_MIN: ${NX_DATE_MIN:-2024-01-01}
+    NX_DATE_MAX: ${NX_DATE_MAX:-2025-06-30}
+    NX_GATE_SCALE: ${NX_GATE_SCALE:-1}
+    # warehouse connection (inside the docker network)
+    WH_HOST: wh
+    WH_PORT: "5432"
+    WH_DB: wh
+    WH_USER: wh
+    WH_PASSWORD: ${WH_PW}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./src:/opt/airflow/src
+    - ./sql:/opt/airflow/sql
+    - ./tools:/opt/airflow/tools
+    - ./plugins:/opt/airflow/plugins
+    - ./logs:/opt/airflow/logs
+    - ./data:/opt/airflow/data:ro      # raw CSVs: read-only, the pipeline can never change them
+    - ./out:/opt/airflow/out           # cleaned CSVs (see NX_CLEAN_MODE in the README)
+  depends_on: &airflow-common-depends-on
+    airflow-db:
+      condition: service_healthy
+    wh:
+      condition: service_healthy
+
+services:
+  airflow-db:                          # Airflow's own metadata database
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PW}
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 10
+    restart: always
+
+  wh:                                  # the data warehouse (schemas clean, audit, staging, dw)
+    image: postgres:16
+    environment:
+      POSTGRES_USER: wh
+      POSTGRES_PASSWORD: ${WH_PW}
+      POSTGRES_DB: wh
+    ports:
+      - "5433:5432"
+    volumes:
+      - wh-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "wh"]
+      interval: 5s
+      retries: 10
+    restart: always
+
+  airflow-init:                        # one-off: create folders, migrate metadata DB, create the UI login
+    <<: *airflow-common
+    user: "0:0"
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        for v in WH_PW AIRFLOW_DB_PW AIRFLOW_ADMIN_PW AIRFLOW_SECRET_KEY; do
+          if [ -z "$${!v}" ]; then echo "ERROR: $$v is empty. Copy .env.example to .env and fill it in."; exit 1; fi
+        done
+        mkdir -p /sources/logs /sources/data /sources/out
+        chown -R "${AIRFLOW_UID:-50000}:0" /sources/logs
+        # give Airflow write access to out/ only while it is empty (never touches existing cleaned files)
+        if [ -z "$$(ls -A /sources/out)" ]; then chown "${AIRFLOW_UID:-50000}:0" /sources/out; fi
+        exec /entrypoint airflow version
+    environment:
+      <<: *airflow-common-env
+      WH_PW: ${WH_PW}
+      AIRFLOW_DB_PW: ${AIRFLOW_DB_PW}
+      AIRFLOW_ADMIN_PW: ${AIRFLOW_ADMIN_PW}
+      AIRFLOW_SECRET_KEY: ${AIRFLOW_SECRET_KEY}
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USER:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PW}
+    volumes:
+      - .:/sources
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  airflow-db-data:
+  wh-data:
