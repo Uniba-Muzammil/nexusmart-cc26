@@ -1,0 +1,15 @@
+services:
+  wh:
+    image: postgres:16
+    container_name: cc26-wh-1
+    environment:
+      POSTGRES_DB: wh
+      POSTGRES_USER: wh
+      POSTGRES_PASSWORD: ${WH_PW}
+    ports:
+      - "${WH_PORT:-5433}:5432"
+    volumes:
+      - wh_data:/var/lib/postgresql/data
+
+volumes:
+  wh_data: {}

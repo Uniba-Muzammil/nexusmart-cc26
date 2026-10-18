@@ -52,9 +52,29 @@ extract → validate_raw → clean → check_contract → load_staging
 
 Each task logs records **read / rejected / loaded** (Airflow UI → task → Logs).
 
+# PART C (WAREHOUSE)
+
+# Install Python package
+pip install pandas psycopg2-binary
+# Create the password file TERMINAL
+if (-not (Test-Path .env)) { New-Item .env -ItemType File | Out-Null }
+if (-not (Select-String -Path .env -Pattern '^WH_PW=' -Quiet)) { Add-Content .env "`nWH_PW=Wh_Demo_1234" }
+# Set the environment variables TERMINAL
+$env:COMPOSE_FILE="docker-compose.wh-local.yaml"
+$env:WH_HOST="127.0.0.1" (Leave WH_PORT unset (empty). The default port 5433 is used automatically, by both Docker and the loader. Only set WH_PORT if step 5 fails with port is already allocated (see Troubleshooting))
+# Start the database and wait until it is ready
+docker compose up -d
+do { Start-Sleep 3; docker compose exec -T wh pg_isready -U wh -d wh | Out-Null } until ($LASTEXITCODE -eq 0)
+# Run the full warehouse build
+powershell -ExecutionPolicy Bypass -File sql\run_all.ps1
+# Check the results
+docker compose exec -T wh psql -U wh -d wh -c "SELECT * FROM mart.v_kpi_overall"
+docker compose exec -T wh psql -U wh -d wh -c "SELECT * FROM mart.v_category_performance ORDER BY revenue_rank"
+docker compose exec -T wh psql -U wh -d wh -c "SELECT * FROM mart.v_top5_city_share"
 
 
 
+# IN THE ENDD
 
 
 ## Where the results are
